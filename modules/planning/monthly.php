@@ -120,7 +120,8 @@ foreach($statuses as $st){
 <!-- FullCalendar (single bundle) -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet" />
 <div id="calendar"></div>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
+<!-- Use the global UMD build which exposes window.FullCalendar reliably -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   var calendarEl = document.getElementById('calendar');
@@ -131,6 +132,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // debug: print events data coming from server
   console.log('calendar events data:', <?= $events_json ?>);
+
+  if (typeof FullCalendar === 'undefined') {
+    console.error('FullCalendar global is undefined. The script may have failed to load.');
+    return;
+  }
 
   try {
     // force a fixed height to ensure calendar is visible
