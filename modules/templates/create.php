@@ -64,20 +64,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 <?php endif; ?>
 
+<form method="POST">
+
 <div class="card card-primary">
 <div class="card-header"><h3 class="card-title">Template Information</h3></div>
-<form method="POST">
 <div class="card-body">
 <div class="form-group mb-3">
 <label>Template Name *</label>
-<input type="text" name="template_name" class="form-control" placeholder="e.g., Fire Safety Inspection" required>
+<input type="text" name="template_name" class="form-control" placeholder="e.g., Fire Safety Inspection" required value="<?= isset($template_name) ? htmlspecialchars($template_name) : '' ?>">
 </div>
 <div class="form-group mb-3">
 <label>Description</label>
-<textarea name="description" rows="3" class="form-control" placeholder="Brief description of this checklist template"></textarea>
+<textarea name="description" rows="3" class="form-control" placeholder="Brief description of this checklist template"><?= isset($description) ? htmlspecialchars($description) : '' ?></textarea>
 </div>
 </div>
-</form>
 </div>
 
 <div class="card card-primary mt-3">
@@ -87,33 +87,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <button type="button" class="btn btn-sm btn-info" id="addQuestion"><i class="fas fa-plus"></i> Add Question</button>
 </div>
 </div>
-<form method="POST">
 <div class="card-body">
-<input type="hidden" name="template_name" value="<?= isset($template_name) ? htmlspecialchars($template_name) : '' ?>">
-<input type="hidden" name="description" value="<?= isset($description) ? htmlspecialchars($description) : '' ?>">
 <div id="questionsContainer">
-<div class="question-row mb-2" data-index="0">
-<div class="input-group">
-<span class="input-group-text">Q1</span>
-<input type="text" name="questions[]" class="form-control" placeholder="Enter question">
-<button type="button" class="btn btn-outline-danger removeQuestion" style="display:none;"><i class="fas fa-trash"></i></button>
-</div>
-</div>
+<?php
+// If form submitted with questions, repopulate them; otherwise show one empty row
+$oldQuestions = $_POST['questions'] ?? [''];
+$qc = 0;
+foreach ($oldQuestions as $q) {
+    $qc++;
+    $qText = htmlspecialchars($q);
+    echo "<div class=\"question-row mb-2\" data-index=\"" . ($qc-1) . "\">\n";
+    echo "  <div class=\"input-group\">\n";
+    echo "    <span class=\"input-group-text\">Q{$qc}</span>\n";
+    echo "    <input type=\"text\" name=\"questions[]\" class=\"form-control\" placeholder=\"Enter question\" value=\"{$qText}\">\n";
+    echo "    <button type=\"button\" class=\"btn btn-outline-danger removeQuestion\" style=\"display:none;\"><i class=\"fas fa-trash\"></i></button>\n";
+    echo "  </div>\n";
+    echo "</div>\n";
+}
+?>
 </div>
 </div>
 <div class="card-footer">
 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Create Template</button>
 <a href="index.php" class="btn btn-secondary">Cancel</a>
 </div>
-</form>
 </div>
+
+</form>
 
 </div>
 </section>
 </div>
 
 <script>
-let questionCount = 1;
+let questionCount = document.querySelectorAll('.question-row').length || 1;
 
 document.getElementById('addQuestion').addEventListener('click', function() {
     const container = document.getElementById('questionsContainer');
@@ -143,12 +150,14 @@ function updateQuestionNumbers() {
     document.querySelectorAll('.question-row').forEach((row, idx) => {
         row.querySelector('.input-group-text').textContent = 'Q' + (idx + 1);
     });
+    questionCount = document.querySelectorAll('.question-row').length;
 }
 
 function updateRemoveButtons() {
     const rows = document.querySelectorAll('.question-row');
     rows.forEach((row, idx) => {
-        row.querySelector('.removeQuestion').style.display = rows.length > 1 ? 'block' : 'none';
+        const btn = row.querySelector('.removeQuestion');
+        if (btn) btn.style.display = rows.length > 1 ? 'block' : 'none';
     });
 }
 
