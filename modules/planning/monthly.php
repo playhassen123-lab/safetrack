@@ -56,6 +56,9 @@ foreach($schedules as $row){
     ];
 }
 
+// Safely encode events for JS
+$events_json = json_encode($events, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP);
+
 ?>
 
 <div class="content-wrapper">
@@ -110,13 +113,26 @@ foreach($statuses as $st){
 <div class="card">
 <div class="card-header"><h3 class="card-title">Monthly Calendar</h3></div>
 <div class="card-body">
-<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet' />
+<!-- FullCalendar: include core + daygrid plugin global bundles -->
+<link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.8/main.min.css' rel='stylesheet' />
 <div id='calendar'></div>
-<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.8/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.8/index.global.min.js'></script>
 <script>
+// Debug: ensure FullCalendar is loaded
+if(typeof FullCalendar === 'undefined' && typeof FullCalendarCore === 'undefined'){
+    console.error('FullCalendar not loaded. Check CDN script includes.');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var calendarEl = document.getElementById('calendar');
+    // plugin global name exposed by the daygrid global bundle is FullCalendarDayGrid
+    var plugins = [];
+    if(typeof FullCalendarDayGrid !== 'undefined') plugins.push(FullCalendarDayGrid);
+    else if(typeof FullCalendar !== 'undefined' && FullCalendar.DayGrid) plugins.push(FullCalendar.DayGrid);
+
     var calendar = new FullCalendar.Calendar(calendarEl, {
+        plugins: plugins,
         initialView: 'dayGridMonth',
         initialDate: '<?= $year . '-' . str_pad($month,2,'0',STR_PAD_LEFT) ?>',
         headerToolbar: {
@@ -124,11 +140,11 @@ document.addEventListener('DOMContentLoaded', function() {
             center: 'title',
             right: 'dayGridMonth,dayGridWeek,dayGridDay'
         },
-        events: <?= json_encode($events) ?>,
+        events: <?= $events_json ?>,
         eventClick: function(info){
-            // If event has a URL, navigate to it (open details)
             if(info.event.url){
-                info.jsEvent.preventDefault(); // don't let the browser follow the url yet
+                info.jsEvent.preventDefault();
+                // open in same tab
                 window.location.href = info.event.url;
             }
         }
