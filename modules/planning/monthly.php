@@ -33,6 +33,29 @@ if($status != ''){
 $sql .= " GROUP BY s.id ORDER BY s.inspection_date";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
+$schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Prepare events for calendar
+$color_map = ['Planned'=>'#17a2b8','Assigned'=>'#007bff','In Progress'=>'#ffc107','Completed'=>'#28a745','Verified'=>'#28a745','Closed'=>'#6c757d','Cancelled'=>'#dc3545'];
+$events = [];
+foreach($schedules as $row){
+    $title_parts = [];
+    if(!empty($row['template_name'])) $title_parts[] = $row['template_name'];
+    if(!empty($row['fullname'])) $title_parts[] = $row['fullname'];
+    $title_parts[] = $row['status'];
+    $title = implode(' - ', $title_parts);
+    $start = date('Y-m-d', strtotime($row['inspection_date']));
+    $color = $color_map[$row['status']] ?? '#6c757d';
+    $events[] = [
+        'id' => $row['id'],
+        'title' => $title,
+        'start' => $start,
+        'url' => "schedule_details.php?id=".$row['id'],
+        'backgroundColor' => $color,
+        'borderColor' => $color,
+    ];
+}
+
 ?>
 
 <div class="content-wrapper">
@@ -60,66 +83,62 @@ $stmt->execute($params);
 <div class="card-body">
 <form method="GET">
 <div class="row">
-<div class="col-md-3"><label>Month</label><select name="month" class="form-control"><?php for($i=1;$i<=12;$i++){ $sel=$month==$i?'selected':''; echo "<option value='$i' $sel>".date("F",mktime(0,0,0,$i,1))."</option>"; } ?></select></div>
+<div class="col-md-3"><label>Month</label>
+<select name="month" class="form-control">
+<?php for($i=1;$i<=12;$i++){ $sel = ((int)$month===$i)?'selected':''; echo "<option value='$i' $sel>".date("F",mktime(0,0,0,$i,10))."</option>"; } ?>
+</select>
+</div>
 <div class="col-md-2"><label>Year</label><input type="number" name="year" value="<?= $year ?>" class="form-control"></div>
-<div class="col-md-3"><label>Status</label><select name="status" class="form-control"><option value="">All</option><option value="Planned" <?= $status == 'Planned' ? 'selected' : '' ?>>Planned</option><option value="Assigned" <?= $status == 'Assigned' ? 'selected' : '' ?>>Assigned</option><option value="In Progress" <?= $status == 'In Progress' ? 'selected' : '' ?>>In Progress</option><option value="Completed" <?= $status == 'Completed' ? 'selected' : '' ?>>Completed</option></select></div>
+<div class="col-md-3"><label>Status</label>
+<select name="status" class="form-control">
+<option value="">All</option>
+<?php
+$statuses = ['Planned','Assigned','In Progress','Completed','Verified','Closed','Cancelled'];
+foreach($statuses as $st){
+    $sel = $status == $st ? 'selected' : '';
+    echo "<option value='$st' $sel>$st</option>";
+}
+?>
+</select>
+</div>
 <div class="col-md-4"><label>&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button></div>
 </div>
 </form>
 </div>
 </div>
+
 <div class="card">
-<div class="card-header"><h3 class="card-title">Inspection Planning</h3></div>
-<div class="card-body table-responsive">
-<table class="table table-bordered table-hover">
-<thead class="table-light">
-<tr>
-<th>Date</th>
-<th>Day</th>
-<th>Inspector</th>
-<th>Checklist</th>
-<th>Location</th>
-<th>Status</th>
-<th>Anomalies</th>
-<th>Actions</th>
-</tr>
-</thead>
-<tbody>
-<?php if($stmt->rowCount()>0): ?>
-<?php while($row=$stmt->fetch(PDO::FETCH_ASSOC)): ?>
-<tr>
-<td><?= date("d/m/Y",strtotime($row['inspection_date'])) ?></td>
-<td><?= date("l",strtotime($row['inspection_date'])) ?></td>
-<td><?= htmlspecialchars($row['fullname'] ?? '-') ?></td>
-<td><?= htmlspecialchars($row['template_name'] ?? '-') ?></td>
-<td><?= htmlspecialchars($row['location'] ?? $row['area_name'] ?? '-') ?></td>
-<td>
-<?php 
-$color_map = ['Planned'=>'info','Assigned'=>'primary','In Progress'=>'warning','Completed'=>'success','Verified'=>'success','Closed'=>'secondary','Cancelled'=>'danger'];
-?>
-<span class="badge bg-<?= $color_map[$row['status']] ?? 'secondary' ?>"><?= htmlspecialchars($row['status']) ?></span>
-</td>
-<td>
-<?php if($row['anomaly_count'] > 0): ?>
-<span class="badge bg-danger"><?= $row['anomaly_count'] ?> anomalies</span>
-<?php else: ?>
-<span class="badge bg-success">OK</span>
-<?php endif; ?>
-</td>
-<td>
-<a href="schedule_details.php?id=<?= $row['id'] ?>" class="btn btn-info btn-sm"><i class="fas fa-eye"></i> View</a>
-<a href="edit_schedule.php?id=<?= $row['id'] ?>" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
-<a href="delete_schedule.php?id=<?= $row['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete?')"><i class="fas fa-trash"></i></a>
-</td>
-</tr>
-<?php endwhile; ?>
-<?php else: ?>
-<tr><td colspan="8" class="text-center">No inspection planning found.</td></tr>
-<?php endif; ?>
-</tbody>
-</table>
+<div class="card-header"><h3 class="card-title">Monthly Calendar</h3></div>
+<div class="card-body">
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet' />
+<div id='calendar'></div>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js'></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        initialDate: '<?= $year . '-' . str_pad($month,2,'0',STR_PAD_LEFT) ?>',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,dayGridWeek,dayGridDay'
+        },
+        events: <?= json_encode($events) ?>,
+        eventClick: function(info){
+            // If event has a URL, navigate to it (open details)
+            if(info.event.url){
+                info.jsEvent.preventDefault(); // don't let the browser follow the url yet
+                window.location.href = info.event.url;
+            }
+        }
+    });
+    calendar.render();
+});
+</script>
 </div>
 </div>
+
 </div>
 </section>
 </div>
