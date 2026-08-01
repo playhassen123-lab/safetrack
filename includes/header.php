@@ -14,6 +14,7 @@ if($pathDepth < 0) $basePath = '';
 <title>SafeTrack HSE</title>
 <link rel="stylesheet" href="<?= $basePath ?>assets/adminlte/plugins/fontawesome-free/css/all.min.css">
 <link rel="stylesheet" href="<?= $basePath ?>assets/adminlte/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="<?= $basePath ?>assets/css/calendar.css">
 <link rel="stylesheet" href="<?= $basePath ?>assets/css/style.css">
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
