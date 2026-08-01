@@ -46,11 +46,13 @@ foreach($schedules as $row){
     $title = implode(' - ', $title_parts);
     $start = date('Y-m-d', strtotime($row['inspection_date']));
     $color = $color_map[$row['status']] ?? '#6c757d';
+    // Use basePath from header to build correct URL
+    $event_url = (isset($basePath) ? $basePath : '') . 'modules/planning/schedule_details.php?id=' . $row['id'];
     $events[] = [
         'id' => $row['id'],
         'title' => $title,
         'start' => $start,
-        'url' => "schedule_details.php?id=".$row['id'],
+        'url' => $event_url,
         'backgroundColor' => $color,
         'borderColor' => $color,
     ];
@@ -110,48 +112,108 @@ foreach($statuses as $st){
 </div>
 </div>
 
+<!-- Calendar card placed immediately after filters so it is always visible -->
 <div class="card">
 <div class="card-header"><h3 class="card-title">Monthly Calendar</h3></div>
 <div class="card-body">
-<!-- FullCalendar: include core + daygrid plugin global bundles -->
-<link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.8/main.min.css' rel='stylesheet' />
-<div id='calendar'></div>
-<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.8/index.global.min.js'></script>
-<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.8/index.global.min.js'></script>
+<style>#calendar{max-width:100%;margin:0 auto;min-height:600px;height:auto;}</style>
+<!-- FullCalendar (single bundle) -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet" />
+<div id="calendar"></div>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
 <script>
-// Debug: ensure FullCalendar is loaded
-if(typeof FullCalendar === 'undefined' && typeof FullCalendarCore === 'undefined'){
-    console.error('FullCalendar not loaded. Check CDN script includes.');
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-    var calendarEl = document.getElementById('calendar');
-    // plugin global name exposed by the daygrid global bundle is FullCalendarDayGrid
-    var plugins = [];
-    if(typeof FullCalendarDayGrid !== 'undefined') plugins.push(FullCalendarDayGrid);
-    else if(typeof FullCalendar !== 'undefined' && FullCalendar.DayGrid) plugins.push(FullCalendar.DayGrid);
+  var calendarEl = document.getElementById('calendar');
+  if (!calendarEl) {
+    console.error('Calendar element not found');
+    return;
+  }
+
+  // debug: print events data coming from server
+  console.log('calendar events data:', <?= $events_json ?>);
+
+  try {
+    // force a fixed height to ensure calendar is visible
+    calendarEl.style.minHeight = '600px';
 
     var calendar = new FullCalendar.Calendar(calendarEl, {
-        plugins: plugins,
-        initialView: 'dayGridMonth',
-        initialDate: '<?= $year . '-' . str_pad($month,2,'0',STR_PAD_LEFT) ?>',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,dayGridWeek,dayGridDay'
-        },
-        events: <?= $events_json ?>,
-        eventClick: function(info){
-            if(info.event.url){
-                info.jsEvent.preventDefault();
-                // open in same tab
-                window.location.href = info.event.url;
-            }
+      initialView: 'dayGridMonth',
+      initialDate: '<?= $year . '-' . str_pad($month,2,'0',STR_PAD_LEFT) ?>',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,dayGridWeek,dayGridDay'
+      },
+      events: <?= $events_json ?>,
+      eventClick: function(info) {
+        if (info.event.url) {
+          info.jsEvent.preventDefault();
+          window.location.href = info.event.url;
         }
+      }
     });
+
     calendar.render();
+    console.log('FullCalendar initialized successfully');
+  } catch (err) {
+    console.error('FullCalendar initialization error:', err);
+  }
 });
 </script>
+</div>
+</div>
+
+<!-- Existing inspection planning table remains below the calendar -->
+<div class="card">
+<div class="card-header"><h3 class="card-title">Inspection Planning</h3></div>
+<div class="card-body table-responsive">
+<table class="table table-bordered table-hover">
+<thead class="table-light">
+<tr>
+<th>Date</th>
+<th>Day</th>
+<th>Inspector</th>
+<th>Checklist</th>
+<th>Location</th>
+<th>Status</th>
+<th>Anomalies</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody>
+<?php if(count($schedules)>0): ?>
+<?php foreach($schedules as $row): ?>
+<tr>
+<td><?= date("d/m/Y",strtotime($row['inspection_date'])) ?></td>
+<td><?= date("l",strtotime($row['inspection_date'])) ?></td>
+<td><?= htmlspecialchars($row['fullname'] ?? '-') ?></td>
+<td><?= htmlspecialchars($row['template_name'] ?? '-') ?></td>
+<td><?= htmlspecialchars($row['location'] ?? $row['area_name'] ?? '-') ?></td>
+<td>
+<?php 
+$color_map = ['Planned'=>'info','Assigned'=>'primary','In Progress'=>'warning','Completed'=>'success','Verified'=>'success','Closed'=>'secondary','Cancelled'=>'danger'];
+?>
+<span class="badge bg-<?= $color_map[$row['status']] ?? 'secondary' ?>"><?= htmlspecialchars($row['status']) ?></span>
+</td>
+<td>
+<?php if($row['anomaly_count'] > 0): ?>
+<span class="badge bg-danger"><?= $row['anomaly_count'] ?> anomalies</span>
+<?php else: ?>
+<span class="badge bg-success">OK</span>
+<?php endif; ?>
+</td>
+<td>
+<a href="schedule_details.php?id=<?= $row['id'] ?>" class="btn btn-info btn-sm"><i class="fas fa-eye"></i> View</a>
+<a href="edit_schedule.php?id=<?= $row['id'] ?>" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+<a href="delete_schedule.php?id=<?= $row['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete?')"><i class="fas fa-trash"></i></a>
+</td>
+</tr>
+<?php endforeach; ?>
+<?php else: ?>
+<tr><td colspan="8" class="text-center">No inspection planning found.</td></tr>
+<?php endif; ?>
+</tbody>
+</table>
 </div>
 </div>
 
